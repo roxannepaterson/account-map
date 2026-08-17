@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,500;1,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E2A32;
+    --ink-soft:#4A5A63;
+    --paper:#F6F4EE;
+    --panel:#FFFFFF;
+    --line:#DAD5C8;
+    --promoter:#5F8768;
+    --promoter-soft:#E4EDE3;
+    --neutral-soft:#EFEBE0;
+    --detractor:#B0563F;
+    --detractor-soft:#F3E2DC;
+    --gold:#B9922F;
+    --shadow: 0 2px 10px rgba(30,42,50,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{ max-width:1000px; margin:0 auto; padding:28px 20px 60px; }
+  .topbar{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    gap:16px; margin-bottom:6px; flex-wrap:wrap;
+  }
+  .title-block{ flex:1; min-width:220px; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--gold); margin:0 0 6px;
+  }
+  .acct-name{
+    font-family:'Newsreader', serif; font-style:italic; font-weight:600; font-size:30px;
+    border:none; background:transparent; color:var(--ink); width:100%; padding:2px 0;
+    outline:none; border-bottom:1px solid transparent;
+  }
+  .acct-name:hover, .acct-name:focus{ border-bottom:1px solid var(--line); }
+  .sub{ color:var(--ink-soft); font-size:13px; margin:4px 0 0; }
+  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  select{
+    font-family:'IBM Plex Sans', sans-serif; font-size:13px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:7px; background:var(--panel); color:var(--ink);
+  }
+  button{
+    font-family:'IBM Plex Sans', sans-serif; font-weight:600; font-size:13px; cursor:pointer;
+    border-radius:7px; border:1px solid var(--ink); background:var(--ink); color:var(--paper);
+    padding:9px 14px; transition:opacity .15s;
+  }
+  button:hover{ opacity:0.85; }
+  button.secondary{ background:transparent; color:var(--ink); border:1px solid var(--line); }
+  button.danger{ background:transparent; color:var(--detractor); border:1px solid var(--detractor); }
+  button.small{ padding:5px 10px; font-size:12px; }
+
+  .status-row{ margin:14px 0 0; font-size:12px; color:var(--ink-soft); }
+  .error-row{ display:none; margin:6px 0 0; font-size:12px; font-weight:600; color:var(--detractor); }
+
+  .tabs{
+    display:flex; gap:6px; margin:26px 0 16px; border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .tab-btn{
+    background:transparent; border:none; color:var(--ink-soft); font-weight:600;
+    font-size:13px; padding:10px 4px; margin-right:18px; border-bottom:2px solid transparent;
+    border-radius:0; cursor:pointer;
+  }
+  .tab-btn.active{ color:var(--ink); border-bottom:2px solid var(--gold); }
+  .tab-btn:hover{ opacity:0.8; }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  .panel-head{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    margin-bottom:14px; gap:12px; flex-wrap:wrap;
+  }
+  .panel-desc{ font-size:12.5px; color:var(--ink-soft); max-width:520px; margin:0; }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    box-shadow:var(--shadow); overflow-x:auto;
+  }
+  table{ width:100%; min-width:760px; border-collapse:collapse; font-size:12.5px; }
+  th, td{ text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; white-space:nowrap; }
+  td.notes-cell{ white-space:normal; }
+  th{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft);
+    background:var(--neutral-soft);
+  }
+  tr:last-child td{ border-bottom:none; }
+  td.notes-cell{ color:var(--ink-soft); font-size:12.5px; max-width:260px; }
+  .row-actions{ white-space:nowrap; }
+  .row-actions button{ padding:4px 9px; font-size:11.5px; margin-left:4px; }
+  .empty{ padding:26px 14px; text-align:center; color:var(--ink-soft); font-size:13px; }
+
+  .overview-panel .card{ padding:18px 20px; }
+  .overview-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .overview-grid .field-full{ grid-column:1 / -1; }
+  @media (max-width:640px){ .overview-grid{ grid-template-columns:1fr; } }
+  .overview-field label{ display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:4px; }
+  .overview-field input[type=text], .overview-field textarea{
+    width:100%; padding:8px 9px; border:1px solid var(--line); border-radius:6px;
+    font-family:'IBM Plex Sans', sans-serif; font-size:13px; color:var(--ink); background:#fff;
+  }
+  .overview-field textarea{ min-height:60px; resize:vertical; }
+  .key-panel .card{ padding:6px 0; }
+  .key-item{ padding:16px 18px; border-bottom:1px solid var(--line); }
+  .key-item:last-child{ border-bottom:none; }
+  .key-q{ font-family:'Newsreader', serif; font-style:italic; font-weight:600; font-size:16px; margin:0 0 8px; }
+  .key-controls{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .key-controls select{ min-width:220px; }
+  .key-controls input[type=text]{
+    flex:1; min-width:180px; padding:8px 10px; border:1px solid var(--line);
+    border-radius:7px; font-size:13px; font-family:'IBM Plex Sans', sans-serif;
+  }
+
+  /* Modal */
+  .overlay{ position:fixed; inset:0; background:rgba(30,42,50,0.35); display:none; align-items:center; justify-content:center; z-index:100; padding:20px; }
+  .overlay.open{ display:flex; }
+  .modal{ background:var(--panel); border-radius:12px; padding:24px; width:420px; max-width:100%; max-height:88vh; overflow-y:auto; box-shadow:0 12px 40px rgba(0,0,0,0.2); }
+  .modal h3{ margin:0 0 14px; font-family:'Newsreader', serif; font-style:italic; font-weight:600; font-size:20px; }
+  .field{ margin-bottom:12px; }
+  .field label{ display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:4px; }
+  .field input[type=text], .field textarea, .field select{
+    width:100%; padding:8px 9px; border:1px solid var(--line); border-radius:6px;
+    font-family:'IBM Plex Sans', sans-serif; font-size:13px; color:var(--ink); background:#fff;
+  }
+  .field textarea{ resize:vertical; min-height:56px; }
+  .modal-actions{ display:flex; justify-content:space-between; margin-top:18px; gap:8px; }
+
+  .footer-note{ margin-top:26px; font-size:11.5px; color:var(--ink-soft); text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="title-block">
+      <p class="eyebrow">Account intelligence · Pre-outreach mapping</p>
+      <input class="acct-name" id="acctName" value="Untitled account" />
+      <p class="sub">Map the estate, the people, the supply chain, and the live triggers — before you make contact.</p>
+    </div>
+    <div class="controls">
+      <select id="acctSelect"></select>
+      <button class="secondary small" id="newAcctBtn">+ New account</button>
+    </div>
+  </div>
+
+  <p class="status-row" id="connStatus">Connecting…</p>
+  <p class="error-row" id="errorBanner"></p>
+
+  <div class="tabs" id="tabNav"></div>
+
+  <div id="panels"></div>
+
+  <p class="footer-note">Shared with your team — changes save live for everyone.</p>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+(async function(){
+  // --- Firebase setup: same shared database as your other BD tools ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyCAfe2rpI8oBEytDVXHK7sxwSmtafbiUVk",
+    authDomain: "bd-tools-73705.firebaseapp.com",
+    databaseURL: "https://bd-tools-73705-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "bd-tools-73705",
+    storageBucket: "bd-tools-73705.firebasestorage.app",
+    messagingSenderId: "69658106175",
+    appId: "1:69658106175:web:c9e59018b394e17c8edb8a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const connStatus = document.getElementById('connStatus');
+  const errorBanner = document.getElementById('errorBanner');
+  function setStatus(text){ connStatus.textContent = text; }
+  function showError(text){ errorBanner.textContent = text; errorBanner.style.display = 'block'; }
+  window.addEventListener('error', (e)=> showError('Page error: ' + (e.message || 'unknown error')));
+  window.addEventListener('unhandledrejection', (e)=> showError('Connection error: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))));
+
+  setStatus('Connecting…');
+  await new Promise((resolve)=>{
+    firebase.auth().onAuthStateChanged((user)=>{
+      if (user){ resolve(); }
+      else {
+        firebase.auth().signInAnonymously().catch((e)=>{
+          setStatus('Could not connect.');
+          showError('Sign-in failed: ' + e.code + ' — ' + e.message);
+          resolve();
+        });
+      }
+    });
+  });
+
+  const uid = () => 'a_' + Math.random().toString(36).slice(2,10);
+  function escapeHtml(str){ const d = document.createElement('div'); d.textContent = str||''; return d.innerHTML; }
+
+  // --- Tab schema definitions ---
+  const TABS = [
+    {
+      key: 'estate', label: 'UK Estate',
+      desc: 'Every office or site — size, tenure, lease position, advisers, and who decides for that site.',
+      addLabel: '+ Add site',
+      columns: [
+        { key:'site', label:'Site', type:'text', placeholder:'e.g. Cheltenham' },
+        { key:'function', label:'Function', type:'text', placeholder:'e.g. Cyber, Corporate HQ' },
+        { key:'sqft', label:'Approx size (sq ft)', type:'text' },
+        { key:'headcount', label:'Approx headcount', type:'text' },
+        { key:'tenure', label:'Tenure', type:'select', options:['Freehold','Leasehold','Unknown'] },
+        { key:'leaseEvent', label:'Lease expiry / break', type:'text', placeholder:'e.g. Break Mar 2027, expiry 2030' },
+        { key:'landlord', label:'Landlord', type:'text' },
+        { key:'managingAgent', label:'Managing agent', type:'text' },
+        { key:'propertyAdviser', label:'Property adviser', type:'text' },
+        { key:'fitoutHistory', label:'Fit-out history', type:'textarea', placeholder:'Who fitted this site out previously?' },
+        { key:'decisionMaker', label:'Site decision maker', type:'text', placeholder:'Named person, if known' }
+      ]
+    },
+    {
+      key: 'people', label: 'People Map',
+      desc: 'Named contacts across Real Estate, Facilities, Projects, Procurement, Security, Finance and site leadership.',
+      addLabel: '+ Add contact',
+      columns: [
+        { key:'name', label:'Name', type:'text' },
+        { key:'role', label:'Role / title', type:'text' },
+        { key:'department', label:'Function', type:'select', options:['Executive Leadership (C-Suite)','HR / Chief of Staff','Real Estate','Facilities','Projects','Procurement','Security','Finance','Site Leadership','Other'] },
+        { key:'reportsTo', label:'Reports to', type:'text' },
+        { key:'notes', label:'Notes', type:'textarea' }
+      ]
+    },
+    {
+      key: 'supply', label: 'Supply Chain',
+      desc: 'Historic architects, fit-out contractors, PMs, cost consultants, FM providers, agents and landlords.',
+      addLabel: '+ Add firm',
+      columns: [
+        { key:'name', label:'Firm name', type:'text' },
+        { key:'category', label:'Category', type:'select', options:['Architect','Fit-out Contractor','Project Manager','Cost Consultant','FM Provider','Property Agent','Landlord','Other'] },
+        { key:'notes', label:'Notes / history', type:'textarea' }
+      ]
+    },
+    {
+      key: 'opportunities', label: 'Opportunities',
+      desc: 'Lease events, expansions, refurbishments, vacancies, planning activity, contract wins and other triggers.',
+      addLabel: '+ Add opportunity',
+      columns: [
+        { key:'type', label:'Type', type:'select', options:['Lease event','Expansion','Refurbishment','Vacancy','Planning activity','Contract win','Other'] },
+        { key:'site', label:'Site / location', type:'text' },
+        { key:'timing', label:'Timing', type:'text', placeholder:'e.g. Q3 2027' },
+        { key:'status', label:'Status', type:'select', options:['Watching','Confirmed','In progress','Closed'] },
+        { key:'description', label:'Description', type:'textarea' }
+      ]
+    }
+  ];
+
+  const KEY_QUESTIONS = [
+    { key:'knowsFirst', label:'Who would know first?' },
+    { key:'developsReq', label:'Who would develop the requirement?' },
+    { key:'approvesSpend', label:'Who would approve the spend?' },
+    { key:'runsProject', label:'Who would run the project?' },
+    { key:'tendersFitout', label:'Who would tender the fit-out?' }
+  ];
+
+  const OVERVIEW_FIELDS = [
+    { key:'industry', label:'Industry', type:'text', placeholder:'e.g. Aerospace & Defence' },
+    { key:'turnover', label:'Annual turnover', type:'text', placeholder:'e.g. £2.1bn (global) / £180m (UK)' },
+    { key:'globalHeadcount', label:'Global headcount', type:'text' },
+    { key:'ukHeadcount', label:'UK headcount', type:'text' },
+    { key:'ownership', label:'Ownership / parent company', type:'text', placeholder:'e.g. Listed NYSE, or subsidiary of…' },
+    { key:'hq', label:'Global HQ location', type:'text' },
+    { key:'website', label:'Website', type:'text' },
+    { key:'notes', label:'Other notes', type:'textarea', full:true, placeholder:'Anything else worth knowing before outreach — recent news, stock exchange listing, key products, etc.' }
+  ];
+
+  // --- State ---
+  let accounts = [];              // [{id, name}]
+  let currentAccountId = null;
+  let activeTab = 'overview';
+  let tabData = { estate: [], people: [], supply: [], opportunities: [] };
+  let overview = {};
+  let keyAnswers = {};             // { knowsFirst: {personId, note}, ... }
+  let tabRefs = {};
+  let keyRef = null;
+  let overviewRef = null;
+
+  const acctSelect = document.getElementById('acctSelect');
+  const acctName = document.getElementById('acctName');
+  const tabNav = document.getElementById('tabNav');
+  const panelsEl = document.getElementById('panels');
+  const overlay = document.getElementById('overlay');
+  const modalBody = document.getElementById('modalBody');
+
+  const accountsRef = db.ref('accountMapAccounts');
+
+  function objToArray(obj){
+    if (!obj) return [];
+    return Object.keys(obj).map(id => Object.assign({}, obj[id], { id }));
+  }
+
+  function renderAcctSelect(){
+    acctSelect.innerHTML = '';
+    accounts.forEach(a=>{
+      const opt = document.createElement('option');
+      opt.value = a.id; opt.textContent = a.name;
+      if (a.id === currentAccountId) opt.selected = true;
+      acctSelect.appendChild(opt);
+    });
+  }
+
+  async function ensureAtLeastOneAccount(){
+    try{
+      const snap = await accountsRef.get();
+      const arr = objToArray(snap.val());
+      if (!arr.length){
+        const id = uid();
+        await accountsRef.child(id).set({ name: 'Untitled account' });
+        currentAccountId = id;
+      } else {
+        currentAccountId = arr[0].id;
+      }
+    }catch(e){
+      showError('Could not load accounts: ' + e.code + ' — ' + e.message);
+    }
+  }
+
+  function attachAccountsListener(){
+    accountsRef.on('value', (snapshot)=>{
+      const arr = objToArray(snapshot.val());
+      accounts = arr.length ? arr : accounts;
+      if (!accounts.find(a=>a.id===currentAccountId) && accounts.length){
+        currentAccountId = accounts[0].id;
+      }
+      renderAcctSelect();
+      const cur = accounts.find(a=>a.id===currentAccountId);
+      if (cur && document.activeElement !== acctName){ acctName.value = cur.name; }
+    });
+  }
+
+  async function saveAccountName(){
+    const name = acctName.value.trim() || 'Untitled account';
+    try{ await accountsRef.child(currentAccountId).child('name').set(name); }
+    catch(e){ showError('Could not rename account: ' + e.code + ' — ' + e.message); }
+  }
+
+  function detachDataListeners(){
+    Object.values(tabRefs).forEach(ref => ref && ref.off());
+    if (keyRef) keyRef.off();
+    if (overviewRef) overviewRef.off();
+  }
+
+  function attachDataListeners(accountId){
+    detachDataListeners();
+    TABS.forEach(tab=>{
+      const ref = db.ref('accountMapData/' + accountId + '/' + tab.key);
+      tabRefs[tab.key] = ref;
+      ref.on('value', (snapshot)=>{
+        tabData[tab.key] = objToArray(snapshot.val());
+        renderActivePanel();
+      }, (err)=> showError('Could not load ' + tab.label + ': ' + err.code + ' — ' + err.message));
+    });
+    keyRef = db.ref('accountMapKeyAnswers/' + accountId);
+    keyRef.on('value', (snapshot)=>{
+      keyAnswers = snapshot.val() || {};
+      if (activeTab === 'keyquestion') renderActivePanel();
+    }, (err)=> showError('Could not load key question data: ' + err.code + ' — ' + err.message));
+    overviewRef = db.ref('accountMapOverview/' + accountId);
+    overviewRef.on('value', (snapshot)=>{
+      overview = snapshot.val() || {};
+      if (activeTab === 'overview') renderActivePanel();
+    }, (err)=> showError('Could not load company overview: ' + err.code + ' — ' + err.message));
+  }
+
+  async function saveOverviewField(key, value){
+    try{ await db.ref('accountMapOverview/' + currentAccountId + '/' + key).set(value); }
+    catch(e){ showError('Save failed: ' + e.code + ' — ' + e.message); }
+  }
+
+  async function saveEntry(tabKey, entry){
+    try{ await db.ref('accountMapData/' + currentAccountId + '/' + tabKey + '/' + entry.id).set(entry); }
+    catch(e){ showError('Save failed: ' + e.code + ' — ' + e.message); }
+  }
+  async function deleteEntry(tabKey, id){
+    try{ await db.ref('accountMapData/' + currentAccountId + '/' + tabKey + '/' + id).remove(); }
+    catch(e){ showError('Delete failed: ' + e.code + ' — ' + e.message); }
+  }
+  async function saveKeyAnswer(qKey, value){
+    try{ await db.ref('accountMapKeyAnswers/' + currentAccountId + '/' + qKey).set(value); }
+    catch(e){ showError('Save failed: ' + e.code + ' — ' + e.message); }
+  }
+
+  // --- Tab nav rendering ---
+  function renderTabNav(){
+    tabNav.innerHTML = '';
+    const ovBtn = document.createElement('button');
+    ovBtn.className = 'tab-btn' + (activeTab === 'overview' ? ' active' : '');
+    ovBtn.textContent = 'Company Overview';
+    ovBtn.addEventListener('click', ()=>{ activeTab = 'overview'; renderTabNav(); renderActivePanel(); });
+    tabNav.appendChild(ovBtn);
+    TABS.forEach(tab=>{
+      const btn = document.createElement('button');
+      btn.className = 'tab-btn' + (activeTab === tab.key ? ' active' : '');
+      btn.textContent = tab.label;
+      btn.addEventListener('click', ()=>{ activeTab = tab.key; renderTabNav(); renderActivePanel(); });
+      tabNav.appendChild(btn);
+    });
+    const kBtn = document.createElement('button');
+    kBtn.className = 'tab-btn' + (activeTab === 'keyquestion' ? ' active' : '');
+    kBtn.textContent = 'Key Question';
+    kBtn.addEventListener('click', ()=>{ activeTab = 'keyquestion'; renderTabNav(); renderActivePanel(); });
+    tabNav.appendChild(kBtn);
+  }
+
+  function renderActivePanel(){
+    panelsEl.innerHTML = '';
+    if (activeTab === 'overview'){
+      panelsEl.appendChild(buildOverviewPanel());
+      return;
+    }
+    if (activeTab === 'keyquestion'){
+      panelsEl.appendChild(buildKeyQuestionPanel());
+      return;
+    }
+    const tab = TABS.find(t=>t.key===activeTab);
+    panelsEl.appendChild(buildTabPanel(tab));
+  }
+
+  function buildOverviewPanel(){
+    const panel = document.createElement('div');
+    panel.className = 'panel active overview-panel';
+
+    const head = document.createElement('div');
+    head.className = 'panel-head';
+    head.innerHTML = `<p class="panel-desc">The basics on the company itself — before you get into sites, people, or opportunities.</p>`;
+    panel.appendChild(head);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const grid = document.createElement('div');
+    grid.className = 'overview-grid';
+
+    OVERVIEW_FIELDS.forEach(f=>{
+      const field = document.createElement('div');
+      field.className = 'overview-field field' + (f.full ? ' field-full' : '');
+      const label = document.createElement('label');
+      label.textContent = f.label;
+      field.appendChild(label);
+      let input;
+      if (f.type === 'textarea'){
+        input = document.createElement('textarea');
+      } else {
+        input = document.createElement('input');
+        input.type = 'text';
+      }
+      if (f.placeholder) input.placeholder = f.placeholder;
+      input.value = overview[f.key] || '';
+      input.addEventListener('blur', ()=> saveOverviewField(f.key, input.value.trim()));
+      field.appendChild(input);
+      grid.appendChild(field);
+    });
+
+    card.appendChild(grid);
+    panel.appendChild(card);
+    return panel;
+  }
+
+  function buildTabPanel(tab){
+    const panel = document.createElement('div');
+    panel.className = 'panel active';
+
+    const head = document.createElement('div');
+    head.className = 'panel-head';
+    head.innerHTML = `<p class="panel-desc">${escapeHtml(tab.desc)}</p>`;
+    const addBtn = document.createElement('button');
+    addBtn.className = 'small';
+    addBtn.textContent = tab.addLabel;
+    addBtn.addEventListener('click', ()=> openEntryModal(tab, null));
+    head.appendChild(addBtn);
+    panel.appendChild(head);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const rows = tabData[tab.key] || [];
+    if (!rows.length){
+      card.innerHTML = `<div class="empty">Nothing added yet — click "${escapeHtml(tab.addLabel)}" to start.</div>`;
+    } else {
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr>' + tab.columns.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') + '<th></th></tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      rows.forEach(row=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = tab.columns.map(c=>{
+          const val = row[c.key] || '';
+          const cls = c.type === 'textarea' ? ' class="notes-cell"' : '';
+          return `<td${cls}>${escapeHtml(val)}</td>`;
+        }).join('') + `<td class="row-actions"><button class="secondary small edit-btn">Edit</button><button class="danger small del-btn">Remove</button></td>`;
+        tr.querySelector('.edit-btn').addEventListener('click', ()=> openEntryModal(tab, row));
+        tr.querySelector('.del-btn').addEventListener('click', async ()=>{
+          if (confirm('Remove this entry?')) await deleteEntry(tab.key, row.id);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      card.appendChild(table);
+    }
+    panel.appendChild(card);
+    return panel;
+  }
+
+  function openEntryModal(tab, existing){
+    modalBody.innerHTML = '';
+    const h = document.createElement('h3');
+    h.textContent = existing ? 'Edit entry' : tab.addLabel.replace('+ ', '');
+    modalBody.appendChild(h);
+
+    const inputs = {};
+    tab.columns.forEach(col=>{
+      const field = document.createElement('div');
+      field.className = 'field';
+      const label = document.createElement('label');
+      label.textContent = col.label;
+      field.appendChild(label);
+      let input;
+      if (col.type === 'select'){
+        input = document.createElement('select');
+        input.innerHTML = '<option value="">Select…</option>' + col.options.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+      } else if (col.type === 'textarea'){
+        input = document.createElement('textarea');
+        if (col.placeholder) input.placeholder = col.placeholder;
+      } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        if (col.placeholder) input.placeholder = col.placeholder;
+      }
+      if (existing && existing[col.key] !== undefined) input.value = existing[col.key];
+      field.appendChild(input);
+      modalBody.appendChild(field);
+      inputs[col.key] = input;
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'modal-actions';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'danger small';
+    delBtn.textContent = 'Delete';
+    delBtn.style.display = existing ? 'inline-block' : 'none';
+    delBtn.addEventListener('click', async ()=>{
+      if (existing) await deleteEntry(tab.key, existing.id);
+      closeModal();
+    });
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'secondary small';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', closeModal);
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'small';
+    saveBtn.textContent = 'Save';
+    saveBtn.addEventListener('click', async ()=>{
+      const entry = existing ? Object.assign({}, existing) : { id: uid() };
+      tab.columns.forEach(col=>{ entry[col.key] = inputs[col.key].value.trim(); });
+      await saveEntry(tab.key, entry);
+      closeModal();
+    });
+    actions.appendChild(delBtn); actions.appendChild(spacer); actions.appendChild(cancelBtn); actions.appendChild(saveBtn);
+    modalBody.appendChild(actions);
+
+    overlay.classList.add('open');
+  }
+
+  function closeModal(){ overlay.classList.remove('open'); }
+  overlay.addEventListener('click', (e)=>{ if (e.target === overlay) closeModal(); });
+
+  function buildKeyQuestionPanel(){
+    const panel = document.createElement('div');
+    panel.className = 'panel active key-panel';
+
+    const head = document.createElement('div');
+    head.className = 'panel-head';
+    head.innerHTML = `<p class="panel-desc">If this account needed something tomorrow, here's who's actually involved — pulled from your People Map where you've named someone.</p>`;
+    panel.appendChild(head);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const people = tabData.people || [];
+
+    KEY_QUESTIONS.forEach(q=>{
+      const item = document.createElement('div');
+      item.className = 'key-item';
+      const qEl = document.createElement('p');
+      qEl.className = 'key-q';
+      qEl.textContent = q.label;
+      item.appendChild(qEl);
+
+      const controls = document.createElement('div');
+      controls.className = 'key-controls';
+
+      const sel = document.createElement('select');
+      sel.innerHTML = '<option value="">No one named yet…</option>' +
+        people.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}${p.role ? ' — ' + escapeHtml(p.role) : ''}</option>`).join('');
+      const existing = keyAnswers[q.key] || {};
+      if (existing.personId) sel.value = existing.personId;
+
+      const noteInput = document.createElement('input');
+      noteInput.type = 'text';
+      noteInput.placeholder = 'Optional note';
+      if (existing.note) noteInput.value = existing.note;
+
+      sel.addEventListener('change', async ()=>{
+        await saveKeyAnswer(q.key, { personId: sel.value, note: noteInput.value.trim() });
+      });
+      noteInput.addEventListener('blur', async ()=>{
+        await saveKeyAnswer(q.key, { personId: sel.value, note: noteInput.value.trim() });
+      });
+
+      controls.appendChild(sel);
+      controls.appendChild(noteInput);
+      item.appendChild(controls);
+      card.appendChild(item);
+    });
+
+    panel.appendChild(card);
+    return panel;
+  }
+
+  // --- Account switching / creation ---
+  acctSelect.addEventListener('change', ()=>{
+    currentAccountId = acctSelect.value;
+    const a = accounts.find(a=>a.id===currentAccountId);
+    acctName.value = a ? a.name : '';
+    activeTab = 'overview';
+    attachDataListeners(currentAccountId);
+    renderTabNav();
+  });
+
+  document.getElementById('newAcctBtn').addEventListener('click', async ()=>{
+    const id = uid();
+    await accountsRef.child(id).set({ name: 'New account' });
+    currentAccountId = id;
+    acctName.value = 'New account';
+    activeTab = 'overview';
+    attachDataListeners(currentAccountId);
+    renderTabNav();
+  });
+
+  acctName.addEventListener('change', saveAccountName);
+  acctName.addEventListener('blur', saveAccountName);
+
+  // --- Init ---
+  await ensureAtLeastOneAccount();
+  attachAccountsListener();
+  attachDataListeners(currentAccountId);
+  renderTabNav();
+  setStatus('Live — synced with your team.');
+})();
+</script>
+</body>
+</html>
