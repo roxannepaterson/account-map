@@ -29,7 +29,7 @@
     font-family:'IBM Plex Sans', sans-serif;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{ max-width:1000px; margin:0 auto; padding:28px 20px 60px; }
+  .wrap{ max-width:1360px; margin:0 auto; padding:28px 24px 60px; }
   .topbar{
     display:flex; justify-content:space-between; align-items:flex-end;
     gap:16px; margin-bottom:6px; flex-wrap:wrap;
@@ -89,8 +89,8 @@
     background:var(--panel); border:1px solid var(--line); border-radius:10px;
     box-shadow:var(--shadow); overflow-x:auto;
   }
-  table{ width:100%; min-width:760px; border-collapse:collapse; font-size:12.5px; }
-  th, td{ text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; white-space:nowrap; }
+  table{ width:100%; table-layout:fixed; border-collapse:collapse; font-size:12.5px; }
+  th, td{ text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; white-space:normal; word-wrap:break-word; }
   td.notes-cell{ white-space:normal; }
   th{
     font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft);
@@ -499,7 +499,7 @@
     } else {
       const table = document.createElement('table');
       const thead = document.createElement('thead');
-      thead.innerHTML = '<tr>' + tab.columns.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') + '<th></th></tr>';
+      thead.innerHTML = '<tr>' + tab.columns.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') + '<th style="width:100px;"></th></tr>';
       table.appendChild(thead);
       const tbody = document.createElement('tbody');
       rows.forEach(row=>{
