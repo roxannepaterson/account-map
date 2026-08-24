@@ -139,6 +139,49 @@
 
   .footer-note{ margin-top:26px; font-size:11.5px; color:var(--ink-soft); text-align:center; }
 
+  .notes-toolbar{ display:flex; gap:8px; margin-bottom:12px; }
+  .notes-canvas{
+    position:relative; min-height:640px; height:640px; border:1px solid var(--line);
+    border-radius:10px; background:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:24px 24px; background-color:#FDFCF9;
+    overflow:auto;
+  }
+  .note-box{
+    position:absolute; min-width:200px; min-height:130px; width:240px; height:170px;
+    display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; box-shadow:var(--shadow); resize:both; overflow:auto;
+  }
+  .note-box.type-note{ background:#FFF8E1; }
+  .note-box-header{
+    display:flex; align-items:center; justify-content:space-between; padding:6px 8px;
+    background:rgba(30,42,50,0.06); cursor:move; flex-shrink:0; user-select:none;
+  }
+  .note-box-header .nb-type{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft); }
+  .note-box-header .nb-close{ background:none; border:none; color:var(--detractor); font-weight:700; cursor:pointer; padding:0 4px; font-size:14px; }
+  .note-box-body{ flex:1; padding:8px; overflow:auto; }
+  .note-box-body textarea{
+    width:100%; height:100%; border:none; resize:none; background:transparent;
+    font-family:'IBM Plex Sans', sans-serif; font-size:12.5px; color:var(--ink); outline:none;
+  }
+  .nb-table{ width:100%; border-collapse:collapse; font-size:11.5px; }
+  .nb-table td{ border:1px solid var(--line); padding:4px 6px; min-width:50px; }
+  .nb-table-tools{ display:flex; gap:6px; margin-bottom:6px; }
+  .nb-table-tools button{ padding:3px 7px; font-size:10.5px; }
+  .nb-mindmap-center{
+    width:100%; text-align:center; font-weight:700; font-size:12.5px; border:1px solid var(--gold);
+    border-radius:6px; padding:6px; margin-bottom:8px; background:var(--neutral-soft);
+  }
+  .nb-mindmap-branches{ display:flex; flex-wrap:wrap; gap:6px; }
+  .nb-branch{ display:flex; align-items:center; gap:4px; }
+  .nb-branch input{
+    font-size:11.5px; padding:4px 6px; border:1px solid var(--line); border-radius:12px;
+    width:100px; font-family:'IBM Plex Sans', sans-serif;
+  }
+  .nb-branch button{ background:none; border:none; color:var(--detractor); cursor:pointer; font-size:12px; padding:0 2px; }
+  .nb-add-branch{ font-size:10.5px; padding:3px 8px; }
+
   /* --- Print / export report --- */
   #printReport{ display:none; }
   @media print{
@@ -319,6 +362,8 @@
   let tabRefs = {};
   let keyRef = null;
   let overviewRef = null;
+  let notesBoxes = [];
+  let notesRef = null;
 
   const acctSelect = document.getElementById('acctSelect');
   const acctName = document.getElementById('acctName');
@@ -388,6 +433,7 @@
     Object.values(tabRefs).forEach(ref => ref && ref.off());
     if (keyRef) keyRef.off();
     if (overviewRef) overviewRef.off();
+    if (notesRef) notesRef.off();
   }
 
   function attachDataListeners(accountId){
@@ -410,11 +456,25 @@
       overview = snapshot.val() || {};
       if (activeTab === 'overview') renderActivePanel();
     }, (err)=> showError('Could not load company overview: ' + err.code + ' — ' + err.message));
+    notesRef = db.ref('accountMapNotesBoard/' + accountId);
+    notesRef.on('value', (snapshot)=>{
+      notesBoxes = objToArray(snapshot.val());
+      if (activeTab === 'notes') renderActivePanel();
+    }, (err)=> showError('Could not load notes board: ' + err.code + ' — ' + err.message));
   }
 
   async function saveOverviewField(key, value){
     try{ await db.ref('accountMapOverview/' + currentAccountId + '/' + key).set(value); }
     catch(e){ showError('Save failed: ' + e.code + ' — ' + e.message); }
+  }
+
+  async function saveNoteBox(box){
+    try{ await db.ref('accountMapNotesBoard/' + currentAccountId + '/' + box.id).set(box); }
+    catch(e){ showError('Save failed: ' + e.code + ' — ' + e.message); }
+  }
+  async function deleteNoteBox(id){
+    try{ await db.ref('accountMapNotesBoard/' + currentAccountId + '/' + id).remove(); }
+    catch(e){ showError('Delete failed: ' + e.code + ' — ' + e.message); }
   }
 
   async function saveEntry(tabKey, entry){
@@ -445,6 +505,11 @@
       btn.addEventListener('click', ()=>{ activeTab = tab.key; renderTabNav(); renderActivePanel(); });
       tabNav.appendChild(btn);
     });
+    const nBtn = document.createElement('button');
+    nBtn.className = 'tab-btn' + (activeTab === 'notes' ? ' active' : '');
+    nBtn.textContent = 'Notes & Signals';
+    nBtn.addEventListener('click', ()=>{ activeTab = 'notes'; renderTabNav(); renderActivePanel(); });
+    tabNav.appendChild(nBtn);
     const kBtn = document.createElement('button');
     kBtn.className = 'tab-btn' + (activeTab === 'keyquestion' ? ' active' : '');
     kBtn.textContent = 'Key Question';
@@ -456,6 +521,10 @@
     panelsEl.innerHTML = '';
     if (activeTab === 'overview'){
       panelsEl.appendChild(buildOverviewPanel());
+      return;
+    }
+    if (activeTab === 'notes'){
+      panelsEl.appendChild(buildNotesCanvasPanel());
       return;
     }
     if (activeTab === 'keyquestion'){
@@ -725,6 +794,211 @@ TEXT:
 
   function closeModal(){ overlay.classList.remove('open'); }
   overlay.addEventListener('click', (e)=>{ if (e.target === overlay) closeModal(); });
+
+  function buildNotesCanvasPanel(){
+    const panel = document.createElement('div');
+    panel.className = 'panel active';
+
+    const head = document.createElement('div');
+    head.className = 'panel-head';
+    head.innerHTML = `<p class="panel-desc">A free space for anything that doesn't fit the structured tabs — news, half-formed leads, quick thoughts. Drag boxes anywhere, resize from the corner, add as many as you like.</p>`;
+    panel.appendChild(head);
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'notes-toolbar';
+    const addBtn = (label, type) => {
+      const b = document.createElement('button');
+      b.className = 'secondary small';
+      b.textContent = label;
+      b.addEventListener('click', ()=> createNoteBox(type));
+      return b;
+    };
+    toolbar.appendChild(addBtn('+ Sticky note', 'note'));
+    toolbar.appendChild(addBtn('+ Table', 'table'));
+    toolbar.appendChild(addBtn('+ Mindmap', 'mindmap'));
+    panel.appendChild(toolbar);
+
+    const canvas = document.createElement('div');
+    canvas.className = 'notes-canvas';
+    panel.appendChild(canvas);
+
+    notesBoxes.forEach(box => canvas.appendChild(renderNoteBox(box, canvas)));
+
+    return panel;
+  }
+
+  function createNoteBox(type){
+    const count = notesBoxes.length;
+    const box = {
+      id: uid(), type,
+      x: 20 + (count % 4) * 30, y: 20 + (count % 4) * 26,
+      w: 240, h: 170
+    };
+    if (type === 'note') box.note = '';
+    if (type === 'table') box.table = [['','',''],['','',''],['','','']];
+    if (type === 'mindmap') box.mindmap = { center:'', branches:[''] };
+    saveNoteBox(box);
+  }
+
+  function renderNoteBox(box, canvas){
+    const el = document.createElement('div');
+    el.className = 'note-box type-' + box.type;
+    el.style.left = (box.x || 20) + 'px';
+    el.style.top = (box.y || 20) + 'px';
+    el.style.width = (box.w || 240) + 'px';
+    el.style.height = (box.h || 170) + 'px';
+
+    const header = document.createElement('div');
+    header.className = 'note-box-header';
+    const typeLabel = { note:'Sticky note', table:'Table', mindmap:'Mindmap' }[box.type] || box.type;
+    header.innerHTML = `<span class="nb-type">${escapeHtml(typeLabel)}</span>`;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'nb-close';
+    closeBtn.textContent = '×';
+    closeBtn.title = 'Remove';
+    closeBtn.addEventListener('click', async ()=>{
+      if (confirm('Remove this box?')) await deleteNoteBox(box.id);
+    });
+    header.appendChild(closeBtn);
+    el.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'note-box-body';
+
+    function captureSizeAndSave(){
+      box.w = el.offsetWidth;
+      box.h = el.offsetHeight;
+      saveNoteBox(box);
+    }
+
+    if (box.type === 'note'){
+      const ta = document.createElement('textarea');
+      ta.value = box.note || '';
+      ta.placeholder = 'Type anything here…';
+      ta.addEventListener('blur', ()=>{ box.note = ta.value; captureSizeAndSave(); });
+      body.appendChild(ta);
+
+    } else if (box.type === 'table'){
+      const tools = document.createElement('div');
+      tools.className = 'nb-table-tools';
+      const addRowBtn = document.createElement('button');
+      addRowBtn.className = 'secondary'; addRowBtn.textContent = '+ Row';
+      const addColBtn = document.createElement('button');
+      addColBtn.className = 'secondary'; addColBtn.textContent = '+ Col';
+      tools.appendChild(addRowBtn); tools.appendChild(addColBtn);
+      body.appendChild(tools);
+
+      const table = document.createElement('table');
+      table.className = 'nb-table';
+      const rows = box.table && box.table.length ? box.table : [['','']];
+
+      function renderTable(){
+        table.innerHTML = '';
+        rows.forEach((row, rIdx)=>{
+          const tr = document.createElement('tr');
+          row.forEach((cellVal, cIdx)=>{
+            const td = document.createElement('td');
+            td.contentEditable = 'true';
+            td.textContent = cellVal;
+            td.addEventListener('blur', ()=>{
+              rows[rIdx][cIdx] = td.textContent;
+              box.table = rows;
+              captureSizeAndSave();
+            });
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+      }
+      addRowBtn.addEventListener('click', ()=>{
+        rows.push(rows[0].map(()=>''));
+        box.table = rows;
+        renderTable();
+        captureSizeAndSave();
+      });
+      addColBtn.addEventListener('click', ()=>{
+        rows.forEach(r => r.push(''));
+        box.table = rows;
+        renderTable();
+        captureSizeAndSave();
+      });
+      renderTable();
+      body.appendChild(table);
+
+    } else if (box.type === 'mindmap'){
+      const mm = box.mindmap || { center:'', branches:[''] };
+      const centerInput = document.createElement('input');
+      centerInput.type = 'text';
+      centerInput.className = 'nb-mindmap-center';
+      centerInput.placeholder = 'Central topic';
+      centerInput.value = mm.center || '';
+      centerInput.addEventListener('blur', ()=>{
+        mm.center = centerInput.value; box.mindmap = mm; captureSizeAndSave();
+      });
+      body.appendChild(centerInput);
+
+      const branchesWrap = document.createElement('div');
+      branchesWrap.className = 'nb-mindmap-branches';
+
+      function renderBranches(){
+        branchesWrap.innerHTML = '';
+        mm.branches.forEach((val, idx)=>{
+          const row = document.createElement('div');
+          row.className = 'nb-branch';
+          const input = document.createElement('input');
+          input.type = 'text'; input.value = val; input.placeholder = 'Branch';
+          input.addEventListener('blur', ()=>{ mm.branches[idx] = input.value; box.mindmap = mm; captureSizeAndSave(); });
+          const rmBtn = document.createElement('button');
+          rmBtn.textContent = '×';
+          rmBtn.addEventListener('click', ()=>{
+            mm.branches.splice(idx,1);
+            box.mindmap = mm;
+            renderBranches();
+            captureSizeAndSave();
+          });
+          row.appendChild(input); row.appendChild(rmBtn);
+          branchesWrap.appendChild(row);
+        });
+        const addBranchBtn = document.createElement('button');
+        addBranchBtn.className = 'secondary nb-add-branch';
+        addBranchBtn.textContent = '+ Branch';
+        addBranchBtn.addEventListener('click', ()=>{
+          mm.branches.push('');
+          box.mindmap = mm;
+          renderBranches();
+        });
+        branchesWrap.appendChild(addBranchBtn);
+      }
+      renderBranches();
+      body.appendChild(branchesWrap);
+    }
+
+    el.appendChild(body);
+
+    // --- Drag (from header only) ---
+    let dragging = false, startX, startY, origLeft, origTop;
+    header.addEventListener('pointerdown', (e)=>{
+      if (e.target === closeBtn) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      origLeft = el.offsetLeft; origTop = el.offsetTop;
+      header.setPointerCapture(e.pointerId);
+    });
+    header.addEventListener('pointermove', (e)=>{
+      if (!dragging) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      el.style.left = Math.max(0, origLeft + dx) + 'px';
+      el.style.top = Math.max(0, origTop + dy) + 'px';
+    });
+    header.addEventListener('pointerup', ()=>{
+      if (!dragging) return;
+      dragging = false;
+      box.x = el.offsetLeft; box.y = el.offsetTop;
+      saveNoteBox(box);
+    });
+
+    return el;
+  }
 
   function buildKeyQuestionPanel(){
     const panel = document.createElement('div');
