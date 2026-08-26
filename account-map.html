@@ -215,6 +215,7 @@
     <div class="controls">
       <select id="acctSelect"></select>
       <button class="secondary small" id="newAcctBtn">+ New account</button>
+      <button class="secondary small" id="copyLinkBtn">Copy link to this account</button>
       <button class="secondary small" id="downloadBtn">Download summary</button>
     </div>
   </div>
@@ -398,10 +399,13 @@
     try{
       const snap = await accountsRef.get();
       const arr = objToArray(snap.val());
+      const urlAccountId = new URLSearchParams(window.location.search).get('account');
       if (!arr.length){
         const id = uid();
         await accountsRef.child(id).set({ name: 'Untitled account' });
         currentAccountId = id;
+      } else if (urlAccountId && arr.find(a => a.id === urlAccountId)){
+        currentAccountId = urlAccountId;
       } else {
         currentAccountId = arr[0].id;
       }
@@ -927,6 +931,29 @@ TEXT:
 
     } else if (box.type === 'mindmap'){
       const mm = box.mindmap || { center:'', branches:[''] };
+
+      const autoFillToggle = document.createElement('button');
+      autoFillToggle.className = 'secondary nb-add-branch';
+      autoFillToggle.textContent = '✨ Auto-fill from text';
+      autoFillToggle.style.marginBottom = '6px';
+      body.appendChild(autoFillToggle);
+
+      const autoFillPanel = document.createElement('div');
+      autoFillPanel.style.display = 'none';
+      autoFillPanel.style.marginBottom = '8px';
+      autoFillPanel.innerHTML = `
+        <textarea placeholder="Paste notes here…" style="width:100%; min-height:60px; font-size:11.5px; padding:6px; border:1px solid var(--line); border-radius:6px; font-family:'IBM Plex Sans', sans-serif;"></textarea>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
+          <button class="secondary" style="font-size:10.5px; padding:3px 8px;" id="mmGenBtn">Generate</button>
+          <span style="font-size:10.5px; color:var(--ink-soft);" id="mmGenStatus"></span>
+        </div>
+      `;
+      body.appendChild(autoFillPanel);
+
+      autoFillToggle.addEventListener('click', ()=>{
+        autoFillPanel.style.display = autoFillPanel.style.display === 'none' ? 'block' : 'none';
+      });
+
       const centerInput = document.createElement('input');
       centerInput.type = 'text';
       centerInput.className = 'nb-mindmap-center';
@@ -969,6 +996,48 @@ TEXT:
         });
         branchesWrap.appendChild(addBranchBtn);
       }
+
+      const genBtn = autoFillPanel.querySelector('#mmGenBtn');
+      const genStatus = autoFillPanel.querySelector('#mmGenStatus');
+      const genInput = autoFillPanel.querySelector('textarea');
+      genBtn.addEventListener('click', async ()=>{
+        const pasted = genInput.value.trim();
+        if (!pasted){ genStatus.textContent = 'Paste some text first.'; return; }
+        genBtn.disabled = true;
+        genStatus.textContent = 'Thinking…';
+        const prompt = `Read the text below and produce a simple mindmap as JSON with exactly two keys: "center" (a short central topic, a few words) and "branches" (an array of 4-8 short phrases, each a few words, representing the key sub-topics or themes). Respond with ONLY the JSON object — no markdown fences, no commentary.
+
+TEXT:
+"""${pasted}"""`;
+        try{
+          const response = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-6",
+              max_tokens: 1000,
+              messages: [{ role: "user", content: prompt }]
+            })
+          });
+          const data = await response.json();
+          const textBlocks = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+          const cleaned = textBlocks.replace(/```json|```/g, '').trim();
+          const parsed = JSON.parse(cleaned);
+          mm.center = (parsed.center || '').toString();
+          mm.branches = Array.isArray(parsed.branches) ? parsed.branches.map(b=>String(b)) : mm.branches;
+          box.mindmap = mm;
+          centerInput.value = mm.center;
+          renderBranches();
+          captureSizeAndSave();
+          genStatus.textContent = 'Done — edit as needed.';
+        }catch(e){
+          genStatus.textContent = 'Could not generate — try again.';
+          showError('Mindmap generation failed: ' + e.message);
+        }finally{
+          genBtn.disabled = false;
+        }
+      });
+
       renderBranches();
       body.appendChild(branchesWrap);
     }
@@ -1136,6 +1205,19 @@ TEXT:
   document.getElementById('downloadBtn').addEventListener('click', ()=>{
     buildPrintReport();
     window.print();
+  });
+
+  document.getElementById('copyLinkBtn').addEventListener('click', async ()=>{
+    const url = window.location.origin + window.location.pathname + '?account=' + encodeURIComponent(currentAccountId);
+    try{
+      await navigator.clipboard.writeText(url);
+      const btn = document.getElementById('copyLinkBtn');
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(()=>{ btn.textContent = original; }, 1500);
+    }catch(e){
+      prompt('Copy this link:', url);
+    }
   });
 
   // --- Init ---
