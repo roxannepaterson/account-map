@@ -1188,6 +1188,39 @@ TEXT:
       html += `</div>`;
     });
 
+    // Notes & Signals
+    html += `<div class="print-section"><p class="print-h2">Notes & Signals</p>`;
+    if (!notesBoxes.length){
+      html += `<p class="print-empty">Nothing added yet.</p>`;
+    } else {
+      notesBoxes.forEach(box=>{
+        if (box.type === 'note'){
+          if ((box.note || '').trim()){
+            html += `<p class="print-a" style="white-space:pre-wrap; margin-bottom:12px;">${escapePrint(box.note)}</p>`;
+          }
+        } else if (box.type === 'table'){
+          const rows = box.table || [];
+          if (rows.length && rows.some(r => r.some(c => (c||'').trim()))){
+            html += `<table class="print-table" style="margin-bottom:12px;"><tbody>`;
+            rows.forEach(r=>{
+              html += `<tr>` + r.map(c=>`<td>${escapePrint(c)}</td>`).join('') + `</tr>`;
+            });
+            html += `</tbody></table>`;
+          }
+        } else if (box.type === 'mindmap'){
+          const mm = box.mindmap || {};
+          if ((mm.center||'').trim() || (mm.branches||[]).some(b=>(b||'').trim())){
+            html += `<p class="print-q">${escapePrint(mm.center || 'Untitled topic')}</p>`;
+            const branches = (mm.branches||[]).filter(b=>(b||'').trim());
+            if (branches.length){
+              html += `<p class="print-a">${branches.map(b=>escapePrint(b)).join(' · ')}</p>`;
+            }
+          }
+        }
+      });
+    }
+    html += `</div>`;
+
     // Key Question
     html += `<div class="print-section"><p class="print-h2">Key Question</p>`;
     const people = tabData.people || [];
